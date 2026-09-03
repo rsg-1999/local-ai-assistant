@@ -11,6 +11,10 @@ def list_models():
     response = client.list()
     return response
 
+def model_status():
+    client = Client(host=OLLAMA_HOST)
+    return client.ps()
+
 def model_supports_thinking(model):
     now = time.time()
     cached = _capability_cache.get(model)
@@ -23,10 +27,16 @@ def model_supports_thinking(model):
     _capability_cache[model] = (now, result)
     return result
 
-def stream_chat(messages, model=DEFAULT_MODEL):
+def stream_chat(messages, model=DEFAULT_MODEL, num_ctx=8192):
     client = Client(host=OLLAMA_HOST)
     think = model_supports_thinking(model)
-    response = client.chat(model=model, messages=messages, stream=True, think=think)
+    response = client.chat(
+        model=model,
+        messages=messages,
+        stream=True,
+        think=think,
+        options={"num_ctx": num_ctx},
+    )
     for chunk in response:
         if chunk["message"].get("thinking"):
             yield ("thinking", chunk["message"].get("thinking"))

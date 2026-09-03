@@ -7,7 +7,7 @@ import streamlit as st
 from src.config import DEFAULT_MODEL
 from src.conversation import Conversation
 from src.instructions import load_instructions, save_instructions
-from src.llm import list_models, stream_chat
+from src.llm import list_models, model_status, stream_chat
 from src.rag.ingest import build_retriever, ingest_file
 from src.rag.store import load_chunks, save_chunks
 from src.json_store import cleanup_stale_tmp_files
@@ -74,6 +74,16 @@ with st.popover("⚙️"):
     model_names = [m.model for m in list_models().models]
     default_index = model_names.index(DEFAULT_MODEL) if DEFAULT_MODEL in model_names else 0
     selected_model = st.selectbox("Model", model_names, index=default_index)
+
+    ctx_size = st.selectbox("Context window", [4096, 8192, 16384], index=1)
+
+    status = model_status()
+    if status.models:
+        for m in status.models:
+            gpu_pct = round(100 * m.size_vram / m.size) if m.size else 0
+            st.caption(f"{m.model} loaded — {gpu_pct}% GPU")
+    else:
+        st.caption("No model currently loaded")
 
     instructions_text = st.text_area(
         "Custom instructions",
@@ -190,7 +200,7 @@ if prompt:
             reasoning_placeholder = st.empty()
         answer_placeholder = st.empty()
 
-        for kind, piece in stream_chat(messages_for_model, model=selected_model):
+        for kind, piece in stream_chat(messages_for_model, model=selected_model, num_ctx=ctx_size):
             if kind == "thinking":
                 reasoning_text += piece
                 reasoning_placeholder.markdown(reasoning_text)
