@@ -1,3 +1,4 @@
+import glob
 import json
 import os
 import uuid
@@ -20,3 +21,8 @@ def save_json(path, data):
     with open(tmp_path, "w") as f:
         json.dump(data, f)
     os.replace(tmp_path, path)
+
+
+def cleanup_stale_tmp_files(directory="data"):
+    for tmp_path in glob.glob(os.path.join(directory, "*.tmp")):
+        os.remove(tmp_path)

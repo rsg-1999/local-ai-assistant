@@ -19,8 +19,17 @@ class Conversation:
 
     @classmethod
     def from_dict(cls, conv_id, data):
-        return cls(
-            conv_id,
-            title=data.get("title", "New chat"),
-            messages=data.get("messages", []),
-        )
+        title = data.get("title", "New chat")
+        if not isinstance(title, str):
+            title = "New chat"
+
+        messages = data.get("messages", [])
+        if not isinstance(messages, list):
+            messages = []
+        else:
+            messages = [
+                m for m in messages
+                if isinstance(m, dict) and "role" in m and "content" in m
+            ]
+
+        return cls(conv_id, title=title, messages=messages)

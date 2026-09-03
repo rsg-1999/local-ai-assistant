@@ -10,8 +10,13 @@ from src.instructions import load_instructions, save_instructions
 from src.llm import list_models, stream_chat
 from src.rag.ingest import build_retriever, ingest_file
 from src.rag.store import load_chunks, save_chunks
+from src.json_store import cleanup_stale_tmp_files
 from src.storage import load_conversations, save_conversations
 from src.tools.web_search import format_context, search
+
+if "cleaned_tmp_files" not in st.session_state:
+    cleanup_stale_tmp_files()
+    st.session_state.cleaned_tmp_files = True
 
 if "conversations" not in st.session_state:
     st.session_state.conversations = load_conversations()
@@ -100,8 +105,10 @@ with st.popover("⚙️"):
                 st.session_state.ingested_files[doc_path] = content_hash
                 st.success(f"Ingested {uploaded_file.name}")
             except Exception as e:
-                if os.path.exists(doc_path):
+                try:
                     os.remove(doc_path)
+                except FileNotFoundError:
+                    pass
                 st.error(f"Couldn't process {uploaded_file.name}: {e}")
 
     all_chunks = load_chunks()

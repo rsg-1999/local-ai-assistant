@@ -5,12 +5,14 @@ CONVERSATIONS_FILE = "data/conversations.json"
 
 def load_conversations():
     raw = load_json(CONVERSATIONS_FILE, {})
+    if not isinstance(raw, dict):
+        return {}
 
     conversations = {}
     for conv_id, data in raw.items():
         try:
             conversations[conv_id] = Conversation.from_dict(conv_id, data)
-        except (TypeError, AttributeError):
+        except Exception:
             print(f"Skipping malformed conversation entry: {conv_id}")
 
     return conversations
