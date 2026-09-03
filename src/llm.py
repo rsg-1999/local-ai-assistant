@@ -4,41 +4,47 @@ from ollama import Client
 from .config import OLLAMA_HOST, DEFAULT_MODEL
 
 CAPABILITY_CACHE_TTL = 300  # seconds
-_capability_cache = {}
 
-def list_models():
-    client = Client(host=OLLAMA_HOST)
-    response = client.list()
-    return response
 
-def model_status():
-    client = Client(host=OLLAMA_HOST)
-    return client.ps()
+class OllamaClient:
+    def __init__(self, host=OLLAMA_HOST):
+        self.client = Client(host=host)
+        self._capability_cache = {}
 
-def model_supports_thinking(model):
-    now = time.time()
-    cached = _capability_cache.get(model)
-    if cached and now - cached[0] < CAPABILITY_CACHE_TTL:
-        return cached[1]
+    def list_models(self):
+        return self.client.list()
 
-    client = Client(host=OLLAMA_HOST)
-    info = client.show(model)
-    result = "thinking" in (info.capabilities or [])
-    _capability_cache[model] = (now, result)
-    return result
+    def model_status(self):
+        return self.client.ps()
 
-def stream_chat(messages, model=DEFAULT_MODEL, num_ctx=8192):
-    client = Client(host=OLLAMA_HOST)
-    think = model_supports_thinking(model)
-    response = client.chat(
-        model=model,
-        messages=messages,
-        stream=True,
-        think=think,
-        options={"num_ctx": num_ctx},
-    )
-    for chunk in response:
-        if chunk["message"].get("thinking"):
-            yield ("thinking", chunk["message"].get("thinking"))
-        if chunk["message"].get("content"):
-            yield ("content", chunk["message"].get("content"))
+    def unload_model(self, model):
+        self.client.generate(model=model, keep_alive=0)
+
+    def model_supports_thinking(self, model):
+        now = time.time()
+        cached = self._capability_cache.get(model)
+        if cached and now - cached[0] < CAPABILITY_CACHE_TTL:
+            return cached[1]
+
+        info = self.client.show(model)
+        result = "thinking" in (info.capabilities or [])
+        self._capability_cache[model] = (now, result)
+        return result
+
+    def stream_chat(self, messages, model=DEFAULT_MODEL, num_ctx=8192):
+        think = self.model_supports_thinking(model)
+        response = self.client.chat(
+            model=model,
+            messages=messages,
+            stream=True,
+            think=think,
+            options={"num_ctx": num_ctx},
+        )
+        for chunk in response:
+            if chunk["message"].get("thinking"):
+                yield ("thinking", chunk["message"].get("thinking"))
+            if chunk["message"].get("content"):
+                yield ("content", chunk["message"].get("content"))
+
+
+ollama_client = OllamaClient()

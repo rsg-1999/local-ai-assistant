@@ -1,13 +1,14 @@
 import hashlib
 import os
 import uuid
+from datetime import datetime
 
 import streamlit as st
 
-from src.config import DEFAULT_MODEL
+from src.config import ALLOWED_MODELS, DEFAULT_MODEL
 from src.conversation import Conversation
 from src.instructions import load_instructions, save_instructions
-from src.llm import list_models, model_status, stream_chat
+from src.llm import ollama_client
 from src.rag.ingest import build_retriever, ingest_file
 from src.rag.store import load_chunks, save_chunks
 from src.json_store import cleanup_stale_tmp_files
@@ -71,13 +72,22 @@ current = st.session_state.conversations.get(
 ) or Conversation(st.session_state.current_id)
 
 with st.popover("⚙️"):
-    model_names = [m.model for m in list_models().models]
+    pulled_models = [m.model for m in ollama_client.list_models().models]
+    model_names = [m for m in ALLOWED_MODELS if m in pulled_models]
     default_index = model_names.index(DEFAULT_MODEL) if DEFAULT_MODEL in model_names else 0
     selected_model = st.selectbox("Model", model_names, index=default_index)
 
-    ctx_size = st.selectbox("Context window", [4096, 8192, 16384], index=1)
+    if st.session_state.get("active_model") != selected_model:
+        old_model = st.session_state.get("active_model")
+        if old_model:
+            ollama_client.unload_model(old_model)
+        st.session_state.active_model = selected_model
 
-    status = model_status()
+    ctx_size = st.slider(
+        "Context window", min_value=4096, max_value=16384, value=8192, step=1024
+    )
+
+    status = ollama_client.model_status()
     if status.models:
         for m in status.models:
             gpu_pct = round(100 * m.size_vram / m.size) if m.size else 0
@@ -155,7 +165,11 @@ if prompt:
     with st.chat_message("user"):
         st.write(prompt)
 
-    messages_for_model = current.messages
+    today = datetime.now().strftime("%A, %B %d, %Y")
+    messages_for_model = [
+        {"role": "system", "content": f"Today's date is {today}."}
+    ] + current.messages
+
     if instructions_text.strip():
         messages_for_model = [
             {"role": "system", "content": instructions_text}
@@ -168,7 +182,13 @@ if prompt:
         messages_for_model = messages_for_model + [
             {
                 "role": "system",
-                "content": f"Use these web search results if they help answer the question:\n\n{context}",
+                "content": (
+                    f"Today's date is {today}. These are real, live web search results, "
+                    "not hypothetical or fabricated — trust them even if they reference "
+                    "dates or events after your training data. Do not question their "
+                    "validity based on your training cutoff; just use them directly to "
+                    f"answer the question:\n\n{context}"
+                ),
             }
         ]
 
@@ -200,7 +220,7 @@ if prompt:
             reasoning_placeholder = st.empty()
         answer_placeholder = st.empty()
 
-        for kind, piece in stream_chat(messages_for_model, model=selected_model, num_ctx=ctx_size):
+        for kind, piece in ollama_client.stream_chat(messages_for_model, model=selected_model, num_ctx=ctx_size):
             if kind == "thinking":
                 reasoning_text += piece
                 reasoning_placeholder.markdown(reasoning_text)
