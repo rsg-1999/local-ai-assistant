@@ -91,15 +91,17 @@ with st.popover("⚙️"):
         content_hash = hashlib.md5(file_bytes).hexdigest()
 
         if st.session_state.ingested_files.get(doc_path) != content_hash:
-            with open(doc_path, "wb") as f:
-                f.write(file_bytes)
-
             try:
+                os.makedirs("documents", exist_ok=True)
+                with open(doc_path, "wb") as f:
+                    f.write(file_bytes)
+
                 st.session_state.retriever = ingest_file(doc_path)
                 st.session_state.ingested_files[doc_path] = content_hash
                 st.success(f"Ingested {uploaded_file.name}")
             except Exception as e:
-                os.remove(doc_path)
+                if os.path.exists(doc_path):
+                    os.remove(doc_path)
                 st.error(f"Couldn't process {uploaded_file.name}: {e}")
 
     all_chunks = load_chunks()

@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from ollama import Client
 from .config import OLLAMA_HOST, DEFAULT_MODEL
 
@@ -6,10 +8,11 @@ def list_models():
     response = client.list()
     return response
 
+@lru_cache(maxsize=None)
 def model_supports_thinking(model):
     client = Client(host=OLLAMA_HOST)
     info = client.show(model)
-    return "thinking" in info.capabilities
+    return "thinking" in (info.capabilities or [])
 
 def stream_chat(messages, model=DEFAULT_MODEL):
     client = Client(host=OLLAMA_HOST)

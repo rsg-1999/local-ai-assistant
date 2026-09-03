@@ -19,4 +19,8 @@ class Conversation:
 
     @classmethod
     def from_dict(cls, conv_id, data):
-        return cls(conv_id, title=data["title"], messages=data["messages"])
+        return cls(
+            conv_id,
+            title=data.get("title", "New chat"),
+            messages=data.get("messages", []),
+        )

@@ -5,7 +5,15 @@ CONVERSATIONS_FILE = "data/conversations.json"
 
 def load_conversations():
     raw = load_json(CONVERSATIONS_FILE, {})
-    return {conv_id: Conversation.from_dict(conv_id, data) for conv_id, data in raw.items()}
+
+    conversations = {}
+    for conv_id, data in raw.items():
+        try:
+            conversations[conv_id] = Conversation.from_dict(conv_id, data)
+        except (TypeError, AttributeError):
+            print(f"Skipping malformed conversation entry: {conv_id}")
+
+    return conversations
 
 def save_conversations(conversations):
     raw = {conv_id: conv.to_dict() for conv_id, conv in conversations.items()}
